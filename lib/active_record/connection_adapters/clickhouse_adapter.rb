@@ -28,7 +28,13 @@ module ActiveRecord
           raise ArgumentError, 'No database specified. Missing argument: database.'
         end
 
-        ConnectionAdapters::ClickhouseAdapter.new(logger, [host, port, ssl, sslca], { user: config[:username], password: config[:password], database: database }.compact, config)
+        changed_config = { user: config[:username], password: config[:password], database: database}
+
+        if config.key?(:session_id)
+          changed_config[:session_id] = config[:session_id]
+        end
+
+        ConnectionAdapters::ClickhouseAdapter.new(logger, [host, port, ssl, sslca], changed_config.compact, config)
       end
     end
   end
