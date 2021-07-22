@@ -257,8 +257,8 @@ module ActiveRecord
 
       def create_view(table_name, **options)
         options.merge!(view: true)
-        options = apply_replica(table_name, options)
-        td = create_table_definition(apply_cluster(table_name), options)
+        options = apply_replica(table_name, **options)
+        td = create_table_definition(apply_cluster(table_name), **options)
         yield td if block_given?
 
         if options[:force]
@@ -269,8 +269,8 @@ module ActiveRecord
       end
 
       def create_table(table_name, **options)
-        options = apply_replica(table_name, options)
-        td = create_table_definition(apply_cluster(table_name), options)
+        options = apply_replica(table_name, **options)
+        td = create_table_definition(apply_cluster(table_name), **options)
         yield td if block_given?
 
         if options[:force]
@@ -293,12 +293,12 @@ module ActiveRecord
         do_execute apply_cluster "RENAME TABLE #{quote_table_name(table_name)} TO #{quote_table_name(new_name)}"
       end
 
-      def drop_table(table_name, options = {}) # :nodoc:
+      def drop_table(table_name, **options) # :nodoc:
         do_execute apply_cluster "DROP TABLE#{' IF EXISTS' if options[:if_exists]} #{quote_table_name(table_name)}"
       end
 
-      def change_column(table_name, column_name, type, options = {})
-        result = do_execute "ALTER TABLE #{quote_table_name(table_name)} #{change_column_for_alter(table_name, column_name, type, options)}"
+      def change_column(table_name, column_name, type, **options)
+        result = do_execute "ALTER TABLE #{quote_table_name(table_name)} #{change_column_for_alter(table_name, column_name, type, **options)}"
         raise "Error parse json response: #{result}" if result.presence && !result.is_a?(Hash)
       end
 
@@ -347,9 +347,9 @@ module ActiveRecord
         result
       end
 
-      def change_column_for_alter(table_name, column_name, type, options = {})
-        td = create_table_definition(table_name)
-        cd = td.new_column_definition(column_name, type, options)
+      def change_column_for_alter(table_name, column_name, type, **options)
+        td = create_table_definition(table_name, **options)
+        cd = td.new_column_definition(column_name, type, **options)
         schema_creation.accept(ChangeColumnDefinition.new(cd, column_name))
       end
 
@@ -365,7 +365,7 @@ module ActiveRecord
         @connection
       end
 
-      def apply_replica(table, options)
+      def apply_replica(table, **options)
         if replica && cluster && options[:options]
           match = options[:options].match(/^(.*?MergeTree)\(([^\)]*)\)(.*?)$/)
           if match
