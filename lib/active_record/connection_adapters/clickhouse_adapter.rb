@@ -52,7 +52,7 @@ module ActiveRecord
       orders = order_values.uniq
       orders.reject!(&:blank?)
       if self.connection.is_a?(ConnectionAdapters::ClickhouseAdapter) && orders.empty? && !primary_key
-        self.order_values = %w(date created_at).select {|c| column_names.include?(c) }.map{|c| arel_attribute(c).desc }
+        self.order_values = %w(date created_at).select { |c| column_names.include?(c) }.map{ |c| arel_table[c].desc }
       else
         self.order_values = reverse_sql_order(orders)
       end
@@ -117,7 +117,7 @@ module ActiveRecord
         uint16: { name: 'UInt16' },
         uint32: { name: 'UInt32' },
         uint64: { name: 'UInt64' },
-        # uint128: { name: 'UInt128' }, not yet implemented in clickhouse
+        uint128: { name: 'UInt128' },
         uint256: { name: 'UInt256' },
       }.freeze
 
@@ -132,7 +132,8 @@ module ActiveRecord
         @full_config = full_config
 
         @prepared_statements = false
-        if ActiveRecord::version == Gem::Version.new('6.0.0')
+
+        if ActiveRecord::version >= Gem::Version.new('6.0.0')
           @prepared_statement_status = Concurrent::ThreadLocalVar.new(false)
         end
 
@@ -164,49 +165,56 @@ module ActiveRecord
         !native_database_types[type].nil?
       end
 
-      def extract_limit(sql_type) # :nodoc:
-        case sql_type
-          when /(Nullable)?\(?String\)?/
-            super('String')
-          when /(Nullable)?\(?U?Int8\)?/
-            1
-          when /(Nullable)?\(?U?Int16\)?/
-            2
-          when /(Nullable)?\(?U?Int32\)?/
-            nil
-          when /(Nullable)?\(?U?Int64\)?/
-            8
-          else
+      class << self
+        private
+
+          def extract_limit(sql_type) # :nodoc:
+            case sql_type
+            when /(Nullable)?\(?String\)?/
+              super('String')
+            else
+              super
+            end
+          end
+
+          def initialize_type_map(m) # :nodoc:
             super
-        end
+            register_class_with_limit m, %r(String), Type::String
+            register_class_with_limit m, 'Date',  Clickhouse::OID::Date
+            register_class_with_limit m, 'DateTime',  Clickhouse::OID::DateTime
+
+            m.register_type %r(Int8)i, Type::Integer.new(limit: 1)
+            m.register_type %r(Int16)i, Type::Integer.new(limit: 2)
+            m.register_type %r(Int32)i, Type::Integer.new(limit: 4)
+            m.register_type %r(Int64)i, Type::Integer.new(limit: 8)
+            m.register_type %r(Int128)i, Type::Integer.new(limit: 16)
+            m.register_type %r(Int256)i, Type::Integer.new(limit: 32)
+
+            m.register_type %r(UInt8)i, Type::UnsignedInteger.new(limit: 1)
+            m.register_type %r(UInt16)i, Type::UnsignedInteger.new(limit: 2)
+            m.register_type %r(UInt32)i, Type::UnsignedInteger.new(limit: 4)
+            m.register_type %r(UInt64)i, Type::UnsignedInteger.new(limit: 8)
+            m.register_type %r(UInt128)i, Type::UnsignedInteger.new(limit: 16)
+            m.register_type %r(UInt256)i, Type::UnsignedInteger.new(limit: 32)
+
+            register_class_with_limit m, %r(Array), Type::String
+          end
       end
 
-      def initialize_type_map(m) # :nodoc:
-        super
-        register_class_with_limit m, %r(String), Type::String
-        register_class_with_limit m, 'Date',  Clickhouse::OID::Date
-        register_class_with_limit m, 'DateTime',  Clickhouse::OID::DateTime
+      TYPE_MAP = Type::TypeMap.new.tap { |m| initialize_type_map(m) }
 
-        register_class_with_limit m, %r(Int8), Type::Integer
-        register_class_with_limit m, %r(Int16), Type::Integer
-        register_class_with_limit m, %r(Int32), Type::Integer
-        register_class_with_limit m, %r(Int64), Type::Integer
-        register_class_with_limit m, %r(Int128), Type::Integer
-        register_class_with_limit m, %r(Int256), Type::Integer
-
-        register_class_with_limit m, %r(Uint8), Type::UnsignedInteger
-        register_class_with_limit m, %r(UInt16), Type::UnsignedInteger
-        register_class_with_limit m, %r(UInt32), Type::UnsignedInteger
-        register_class_with_limit m, %r(UInt64), Type::UnsignedInteger
-        #register_class_with_limit m, %r(UInt128), Type::UnsignedInteger #not implemnted in clickhouse
-        register_class_with_limit m, %r(UInt256), Type::UnsignedInteger
-        register_class_with_limit m, %r(Array), Type::String
+      def type_map
+        TYPE_MAP
       end
 
       # Quoting time without microseconds
       def quoted_date(value)
         if value.acts_like?(:time)
-          zone_conversion_method = ActiveRecord::Base.default_timezone == :utc ? :getutc : :getlocal
+          zone_conversion_method =  if ActiveRecord::version >= Gem::Version.new('7')
+            ActiveRecord.default_timezone == :utc ? :getutc : :getlocal
+          else
+            ActiveRecord::Base.default_timezone == :utc ? :getutc : :getlocal
+          end
 
           if value.respond_to?(zone_conversion_method)
             value = value.send(zone_conversion_method)
