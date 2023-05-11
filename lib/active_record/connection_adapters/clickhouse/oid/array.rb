@@ -31,6 +31,8 @@ module ActiveRecord
             else
               return value if value.nil?
               case @subtype
+                when Data
+                  deserialize(value.values)
                 when :integer
                   value.to_i
                 when :datetime
