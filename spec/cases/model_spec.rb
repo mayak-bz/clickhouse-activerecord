@@ -102,5 +102,26 @@ RSpec.describe 'Model', :migrations do
         expect(event.array_datetime[1]).to eq('2022-12-05 15:22:49')
       end
     end
+
+    describe '#insert_all' do
+      subject(:insert_all) { model.create(attributes) }
+
+      let(:attributes) do
+        [
+          { array_datetime: [1.day.ago, Time.now, '2022-12-06 15:22:49'],
+            array_string: %w[asdf jkl],
+            date: date
+          },
+          { array_datetime: [Time.now, '2022-12-06 15:22:49'],
+            array_string: %w[value],
+            date: date
+          }
+        ]
+      end
+
+      it 'creates a list of new records' do
+        expect { insert_all }.to change(model, :count).by(2)
+      end
+    end
   end
 end
