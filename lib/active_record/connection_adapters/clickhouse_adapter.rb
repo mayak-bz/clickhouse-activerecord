@@ -295,7 +295,7 @@ module ActiveRecord
       end
 
       def create_table(table_name, **options, &block)
-        options = apply_replica(table_name, options)
+        options = apply_replica(table_name, **options)
         td = create_table_definition(apply_cluster(table_name), **options)
         block.call td if block_given?
         td.column(:id, options[:id], null: false) if options[:id].present? && td[:id].blank?
@@ -330,7 +330,7 @@ module ActiveRecord
         do_execute apply_cluster "RENAME TABLE #{quote_table_name(table_name)} TO #{quote_table_name(new_name)}"
       end
 
-      def drop_table(table_name, options = {}) # :nodoc:
+      def drop_table(table_name, **options) # :nodoc:
         do_execute apply_cluster "DROP TABLE#{' IF EXISTS' if options[:if_exists]} #{quote_table_name(table_name)}"
 
         if options[:with_distributed]
@@ -353,8 +353,8 @@ module ActiveRecord
         execute("ALTER TABLE #{quote_table_name(table_name)} #{remove_column_for_alter(table_name, column_name, type, **options)}", nil, settings: {wait_end_of_query: 1, send_progress_in_http_headers: 1})
       end
 
-      def change_column(table_name, column_name, type, options = {})
-        result = do_execute("ALTER TABLE #{quote_table_name(table_name)} #{change_column_for_alter(table_name, column_name, type, options)}", nil, settings: {wait_end_of_query: 1, send_progress_in_http_headers: 1})
+      def change_column(table_name, column_name, type, **options)
+        result = do_execute("ALTER TABLE #{quote_table_name(table_name)} #{change_column_for_alter(table_name, column_name, type, **options)}", nil, settings: {wait_end_of_query: 1, send_progress_in_http_headers: 1})
         raise "Error parse json response: #{result}" if result.presence && !result.is_a?(Hash)
       end
 
@@ -423,9 +423,9 @@ module ActiveRecord
         result
       end
 
-      def change_column_for_alter(table_name, column_name, type, options = {})
-        td = create_table_definition(table_name, options)
-        cd = td.new_column_definition(column_name, type, options)
+      def change_column_for_alter(table_name, column_name, type, **options)
+        td = create_table_definition(table_name, **options)
+        cd = td.new_column_definition(column_name, type, **options)
         schema_creation.accept(ChangeColumnDefinition.new(cd, column_name))
       end
 
@@ -444,7 +444,7 @@ module ActiveRecord
         @connection
       end
 
-      def apply_replica(table, options)
+      def apply_replica(table, **options)
         if use_replica? && options[:options]
           if options[:options].match(/^Replicated/)
             raise 'Do not try create Replicated table. It will be configured based on the *MergeTree engine.'
