@@ -214,8 +214,8 @@ module ActiveRecord
 
       def _quote(value)
         case value
-        when Array
-          '[' + value.map { |v| _quote(v) }.join(', ') + ']'
+        when Clickhouse::OID::Array::Data
+          '[' + value.values.map { |v| _quote(v) }.join(', ') + ']'
         else
           super
         end

@@ -6,6 +6,8 @@ module ActiveRecord
       module OID # :nodoc:
         class Array < Type::Value # :nodoc:
 
+          Data = Struct.new(:values)
+
           def initialize(sql_type)
             @subtype = case sql_type
                        when /U?Int\d+/
@@ -43,7 +45,7 @@ module ActiveRecord
 
           def serialize(value)
             if value.is_a?(::Array)
-              value.map { |item| serialize(item) }
+              Data.new(value.map { |item| serialize(item) })
             else
               return value if value.nil?
               case @subtype
