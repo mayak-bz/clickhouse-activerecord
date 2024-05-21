@@ -150,7 +150,7 @@ module ActiveRecord
       end
 
       def supports_indexes_in_create?
-        true
+        false
       end
 
       class << self
