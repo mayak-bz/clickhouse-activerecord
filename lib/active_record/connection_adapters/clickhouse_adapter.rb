@@ -330,7 +330,7 @@ module ActiveRecord
       end
 
       def create_table(table_name, request_settings: {}, **options, &block)
-        options = apply_replica(table_name, options)
+        options = apply_replica(table_name, **options)
         td = create_table_definition(apply_cluster(table_name), **options)
         block.call td if block_given?
         # support old migration version: in 5.0 options id: :integer, but 7.1 options empty
@@ -380,7 +380,7 @@ module ActiveRecord
         do_execute apply_cluster "RENAME TABLE #{quote_table_name(table_name)} TO #{quote_table_name(new_name)}"
       end
 
-      def drop_table(table_name, options = {}) # :nodoc:
+      def drop_table(table_name, **options) # :nodoc:
         query = "DROP TABLE"
         query = "#{query} IF EXISTS " if options[:if_exists]
         query = "#{query} #{quote_table_name(table_name)}"
@@ -527,7 +527,7 @@ module ActiveRecord
       end
 
       def change_column_for_alter(table_name, column_name, type, **options)
-        td = create_table_definition(table_name)
+        td = create_table_definition(table_name, **options)
         cd = td.new_column_definition(column_name, type, **options)
         schema_creation.accept(ChangeColumnDefinition.new(cd, column_name))
       end
@@ -551,7 +551,7 @@ module ActiveRecord
         connect
       end
 
-      def apply_replica(table, options)
+      def apply_replica(table, **options)
         if use_replica? && options[:options]
           if options[:options].match(/^Replicated/)
             raise 'Do not try create Replicated table. It will be configured based on the *MergeTree engine.'
