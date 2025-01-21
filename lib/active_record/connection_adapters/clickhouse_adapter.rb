@@ -253,7 +253,7 @@ module ActiveRecord
       def quote(value)
         case value
         when Clickhouse::OID::Array::Data
-          '[' + value.values.map { |v| _quote(v) }.join(', ') + ']'
+          '[' + value.values.map { |v| quote(v) }.join(', ') + ']'
         when Array
           '[' + value.map { |v| quote(v) }.join(', ') + ']'
         when Hash
