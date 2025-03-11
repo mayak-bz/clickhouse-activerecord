@@ -10,6 +10,8 @@ module ActiveRecord
 
           def initialize(sql_type)
             @subtype = case sql_type
+                       when /Tuple\(String, UInt32\)/
+                         :tuple
                        when /U?Int\d+/
                          :integer
                        when /DateTime/
@@ -31,6 +33,8 @@ module ActiveRecord
             else
               return value if value.nil?
               case @subtype
+                when :tuple
+                  value
                 when Data
                   deserialize(value.values)
                 when :integer
@@ -51,6 +55,8 @@ module ActiveRecord
             else
               return value if value.nil?
               case @subtype
+                when :tuple
+                  value
                 when :integer
                   value.to_i
                 when :datetime
